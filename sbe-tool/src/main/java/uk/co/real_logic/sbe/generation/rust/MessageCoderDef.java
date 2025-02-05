@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 Real Logic Limited.
+ * Copyright 2013-2025 Real Logic Limited.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,8 @@ class MessageCoderDef implements RustGenerator.ParentDef
         final List<Token> varData) throws IOException
     {
         indent(sb, 0, "pub mod %s {\n", codecType.toString().toLowerCase());
-        indent(sb, 1, "use super::*;\n\n");
+        indent(sb, 1, "use super::*;\n");
+        indent(sb, 1, "use message_header_codec::*;\n\n");
 
         // i.e. <name>Decoder or <name>Encoder
         final String msgTypeName = formatStructName(msgToken.name()) + codecType.name();
@@ -75,7 +76,7 @@ class MessageCoderDef implements RustGenerator.ParentDef
         }
         else
         {
-            RustGenerator.appendImplDecoderTrait(sb, msgTypeName);
+            RustGenerator.appendImplDecoderTrait(schemaVersionType(), sb, msgTypeName);
         }
 
         RustGenerator.appendImplWithLifetimeHeader(sb, msgTypeName); // impl start
@@ -91,7 +92,7 @@ class MessageCoderDef implements RustGenerator.ParentDef
             appendMessageHeaderDecoderFn(sb);
 
             RustGenerator.generateDecoderFields(sb, fields, 2);
-            RustGenerator.generateDecoderGroups(sb, groups, 2, this);
+            RustGenerator.generateDecoderGroups(schemaVersionType(), sb, groups, 2, this);
             RustGenerator.generateDecoderVarData(sb, varData, 2, false);
         }
         else
@@ -140,13 +141,13 @@ class MessageCoderDef implements RustGenerator.ParentDef
 
     void appendMessageHeaderDecoderFn(final Appendable out) throws IOException
     {
-        indent(out, 2, "pub fn header(self, mut header: MessageHeaderDecoder<ReadBuf<'a>>) -> Self {\n");
+        indent(out, 2, "pub fn header(self, mut header: MessageHeaderDecoder<ReadBuf<'a>>, offset: usize) -> Self {\n");
         indent(out, 3, "debug_assert_eq!(SBE_TEMPLATE_ID, header.template_id());\n");
         indent(out, 3, "let acting_block_length = header.block_length();\n");
         indent(out, 3, "let acting_version = header.version();\n\n");
         indent(out, 3, "self.wrap(\n");
         indent(out, 4, "header.parent().unwrap(),\n");
-        indent(out, 4, "message_header_codec::ENCODED_LENGTH,\n");
+        indent(out, 4, "offset + message_header_codec::ENCODED_LENGTH,\n");
         indent(out, 4, "acting_block_length,\n");
         indent(out, 4, "acting_version,\n");
         indent(out, 3, ")\n");
