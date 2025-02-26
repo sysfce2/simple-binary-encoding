@@ -1,6 +1,7 @@
 name: "CodeQL"
 
 on:
+  workflow_call:
   push:
     branches:
       - master
@@ -10,12 +11,12 @@ on:
       - master
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
   
 env:
   GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dorg.gradle.java.installations.auto-detect=false -Dorg.gradle.warning.mode=fail'
-  CMAKE_VERSION: '3.14.7'
+  JAVA_TOOL_OPTIONS: "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED"
 
 permissions:
   contents: read
@@ -24,7 +25,7 @@ jobs:
  
   java-analyze:
     name: Java Analyze ${{ matrix.java }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -33,7 +34,7 @@ jobs:
       fail-fast: false
       matrix:
         language: [ 'java' ]
-        java: [ '8' ]
+        java: [ '17' ]
 
     steps:
       - name: Checkout code
@@ -57,18 +58,13 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: ${{ matrix.java }}
-      - name: Setup BUILD_JAVA_HOME & BUILD_JAVA_VERSION
-        run: |
-          java -Xinternalversion
-          echo "BUILD_JAVA_HOME=${JAVA_HOME}" >> $GITHUB_ENV
-          echo "BUILD_JAVA_VERSION=${{ matrix.java }}" >> $GITHUB_ENV
-          
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           config-file: ./.github/codeql/codeql-config.yml
-        
+
       - name: Build with Gradle
         run: ./gradlew
 
@@ -79,7 +75,7 @@ jobs:
           
   csharp-analyze:
     name: C# Analyze ${{ matrix.dotnet }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -88,7 +84,7 @@ jobs:
       fail-fast: false
       matrix:
         language: [ 'csharp' ]
-        dotnet: [ '3.1.x' ]
+        dotnet: [ '8.0.x' ]
     env:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -135,9 +131,9 @@ jobs:
         with:
           category: "/language:${{matrix.language}}"
           
-  cpp-gcc-2204-analyze:
+  cpp-gcc-analyze:
     name: C++ GCC Analyze ${{ matrix.version }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -146,7 +142,7 @@ jobs:
       fail-fast: false
       matrix:
         language: ['cpp']
-        version: [ '12' ]
+        version: [ '14' ]
     env:
       CC: gcc-${{ matrix.version }}
       CXX: g++-${{ matrix.version }}
@@ -170,10 +166,7 @@ jobs:
       - name: Install compiler
         run: |
           sudo apt-get install -y g++-${{ matrix.version }}
-          curl -O -L https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz
-          tar xf cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz
-          echo "cmake-${CMAKE_VERSION}-Linux-x86_64/bin" >> $GITHUB_PATH
-          
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
